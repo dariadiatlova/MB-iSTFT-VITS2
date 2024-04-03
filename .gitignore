@@ -1,0 +1,10 @@
+rsync_scripts/
+wandb/
+.DS_store
+./wandb/
+.venv/
+.idea/
+.mypy_cache/
+.pytest_cache/
+__pycache__/
+.ipynb_checkpoints/

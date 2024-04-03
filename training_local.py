@@ -1,6 +1,5 @@
 import os
 
-
 config = "./configs/mb_istft_vits2_base.json"
 mpath = "./models/test"
 
