@@ -5,9 +5,10 @@ import re
 
 import langdetect
 import librosa
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import requests
 import torch
+import wandb
 from scipy import signal
 from scipy.io.wavfile import write
 from torch import nn
@@ -29,17 +30,15 @@ EspeakWrapper.set_library(_ESPEAK_LIBRARY)
 """
 
 # - paths
-path_to_config = "put_your_config_path_here"  # path to .json
-path_to_model = "put_your_model_path_here"  # path to G_xxxx.pth
-
+path_to_config = "/app/configs/mb_istft_vits2_base.json"  # path to .json
+path_to_model = "/app/data/train_logs/G_62000.pth"  # path to G_xxxx.pth
 
 # - text input
 input = "I try to get the waiter's attention by blinking in morse code"
 
-
 # check device
 if torch.cuda.is_available() is True:
-    device = "cuda:0"
+    device = "cuda:5"
 else:
     device = "cpu"
 
@@ -94,11 +93,11 @@ def langdetector(text):  # from PolyLangVITS
         return text
 
 
-speed = 1
-sid = 0
-output_dir = "output"
-os.makedirs(output_dir, exist_ok=True)
-speakers = [name for sid, name in enumerate(hps.speakers) if name != "None"]
+# speed = 1
+# sid = 0
+# output_dir = "output"
+# os.makedirs(output_dir, exist_ok=True)
+# speakers = [name for sid, name in enumerate(hps.speakers) if name != "None"]
 
 
 def vcss(inputstr):  # single
@@ -209,4 +208,74 @@ def ex_voice_conversion(sid_tgt):  # dummy - TODO : further work
     """
 
 
-vcss(input)
+@torch.no_grad()
+def vctk_inference(generator):
+    print(f"Loaded speakers: {generator.n_speakers}")
+    collate_fn = TextAudioCollate(return_ids=True)
+    test_dataset = TextAudioSpeakerLoader(hps.data.test_files, hps.data)
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=32,
+        num_workers=0,
+        shuffle=False,
+        pin_memory=True,
+        drop_last=False,
+        collate_fn=collate_fn,
+    )
+    original_audio_dict, generated_audio_dict = {}, {}
+    with torch.no_grad():
+        for batch_idx, (
+            x,
+            x_lengths,
+            spec,
+            spec_lengths,
+            y,
+            y_lengths,
+            speaker_ids,
+        ) in enumerate(test_loader):
+            x, x_lengths = x.to(device), x_lengths.to(device)
+            y, y_lengths = y.to(device), y_lengths.to(device)
+            speaker_ids = speaker_ids.to(device)
+
+            y_hat, y_hat_mb, attn, mask, *_ = generator.infer(
+                x, x_lengths, max_len=128, sid=speaker_ids
+            )
+            y_hat_lengths = mask.sum([1, 2]).long() * hps.data.hop_length
+
+            y_hat, y_hat_mb, attn, mask, *_ = generator.infer(
+                x, x_lengths, max_len=128, sid=speaker_ids
+            )
+            y_hat_lengths = mask.sum([1, 2]).long() * hps.data.hop_length
+
+            for n in range(y.shape[0]):
+                speaker_id = speaker_ids.detach().cpu()[n]
+                original_audio_dict.update(
+                    {
+                        f"test_audio_original/speaker_{speaker_id}_batch_{batch_idx}_sample_{n}": wandb.Audio(
+                            y[n, :, : y_lengths[n]].squeeze(0).detach().cpu().numpy(),
+                            sample_rate=hps.data.sampling_rate,
+                        )
+                    },
+                )
+
+            for n in range(y_hat.shape[0]):
+                speaker_id = speaker_ids.detach().cpu()[n]
+                generated_audio_dict.update(
+                    {
+                        f"test_audio_generated/speaker_{speaker_id}_batch_{batch_idx}_sample_{n}": wandb.Audio(
+                            y_hat[n, :, : y_hat_lengths[n]]
+                            .squeeze(0)
+                            .detach()
+                            .cpu()
+                            .numpy(),
+                            sample_rate=hps.data.sampling_rate,
+                        )
+                    },
+                )
+    wandb.log(original_audio_dict)
+    wandb.log(generated_audio_dict)
+
+
+# vcss(input)
+wandb.init(project=hps.wandb.project, resume=True, id="xocqlvvl")
+vctk_inference(net_g)

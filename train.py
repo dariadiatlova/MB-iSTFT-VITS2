@@ -62,7 +62,10 @@ def run(rank, n_gpus, hps, dist_url):
         logger.info(hps)
         utils.check_git_hash(hps.model_dir)
         wandb.init(
-            project=hps.wandb.project, dir=hps.wandb.dir, resume=hps.wandb.resume
+            project=hps.wandb.project,
+            dir=hps.wandb.dir,
+            resume=hps.wandb.resume,
+            id=hps.wandb.id,
         )
 
     torch.distributed.barrier()
@@ -227,7 +230,8 @@ def run(rank, n_gpus, hps, dist_url):
                 net_dur_disc,
                 optim_dur_disc,
             )
-        global_step = (epoch_str - 1) * 357  # len(train_loader)
+        global_step = (epoch_str - 1) * len(train_loader)
+        print(f"Successfully initialized from global step: {global_step}!")
     except Exception as e:
         print(e)
         epoch_str = 1
@@ -549,21 +553,20 @@ def evaluate(hps, generator, eval_loader, writer_eval):
                         )
                     },
                 )
-
-            for n in range(y_hat.shape[0]):
-                speaker_id = speaker_ids.detach().cpu()[n]
-                generated_audio_dict.update(
-                    {
-                        f"generated_audio/speaker_{speaker_id}_batch_{batch_idx}_sample_{n}": wandb.Audio(
-                            y_hat[n, :, : y_hat_lengths[n]]
-                            .squeeze(0)
-                            .detach()
-                            .cpu()
-                            .numpy(),
-                            sample_rate=hps.data.sampling_rate,
-                        )
-                    },
-                )
+        for n in range(y_hat.shape[0]):
+            speaker_id = speaker_ids.detach().cpu()[n]
+            generated_audio_dict.update(
+                {
+                    f"generated_audio/speaker_{speaker_id}_batch_{batch_idx}_sample_{n}": wandb.Audio(
+                        y_hat[n, :, : y_hat_lengths[n]]
+                        .squeeze(0)
+                        .detach()
+                        .cpu()
+                        .numpy(),
+                        sample_rate=hps.data.sampling_rate,
+                    )
+                },
+            )
     if global_step == 0:
         wandb.log(original_audio_dict)
     wandb.log(generated_audio_dict)
