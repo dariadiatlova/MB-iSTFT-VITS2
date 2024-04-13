@@ -1,24 +1,15 @@
-import json
-import math
-import os
 import re
 
 import langdetect
-import librosa
 # import matplotlib.pyplot as plt
-import requests
 import torch
 import wandb
-from scipy import signal
 from scipy.io.wavfile import write
-from torch import nn
-from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
 import commons
 import utils
-from data_utils import (TextAudioCollate, TextAudioLoader,
-                        TextAudioSpeakerCollate, TextAudioSpeakerLoader)
+from data_utils import (TextAudioCollate, TextAudioSpeakerCollate, TextAudioSpeakerLoader)
 from models import SynthesizerTrn
 from text import text_to_sequence
 from text.symbols import symbols
@@ -100,55 +91,55 @@ def langdetector(text):  # from PolyLangVITS
 # speakers = [name for sid, name in enumerate(hps.speakers) if name != "None"]
 
 
-def vcss(inputstr):  # single
-    fltstr = re.sub(r"[\[\]\(\)\{\}]", "", inputstr)
-    # fltstr = langdetector(fltstr) #- optional for cjke/cjks type cleaners
-    stn_tst = get_text(fltstr, hps)
+# def vcss(inputstr):  # single
+#     fltstr = re.sub(r"[\[\]\(\)\{\}]", "", inputstr)
+#     # fltstr = langdetector(fltstr) #- optional for cjke/cjks type cleaners
+#     stn_tst = get_text(fltstr, hps)
+#
+#     with torch.no_grad():
+#         x_tst = stn_tst.to(device).unsqueeze(0)
+#         x_tst_lengths = torch.LongTensor([stn_tst.size(0)]).to(device)
+#         audio = (
+#             net_g.infer(
+#                 x_tst,
+#                 x_tst_lengths,
+#                 noise_scale=0.667,
+#                 noise_scale_w=0.8,
+#                 length_scale=1 / speed,
+#             )[0][0, 0]
+#             .data.cpu()
+#             .float()
+#             .numpy()
+#         )
+#     write(f"./{output_dir}/output_{sid}.wav", hps.data.sampling_rate, audio)
+#     print(f"./{output_dir}/output_{sid}.wav Generated!")
 
-    with torch.no_grad():
-        x_tst = stn_tst.to(device).unsqueeze(0)
-        x_tst_lengths = torch.LongTensor([stn_tst.size(0)]).to(device)
-        audio = (
-            net_g.infer(
-                x_tst,
-                x_tst_lengths,
-                noise_scale=0.667,
-                noise_scale_w=0.8,
-                length_scale=1 / speed,
-            )[0][0, 0]
-            .data.cpu()
-            .float()
-            .numpy()
-        )
-    write(f"./{output_dir}/output_{sid}.wav", hps.data.sampling_rate, audio)
-    print(f"./{output_dir}/output_{sid}.wav Generated!")
 
-
-def vcms(inputstr, sid):  # multi
-    fltstr = re.sub(r"[\[\]\(\)\{\}]", "", inputstr)
-    # fltstr = langdetector(fltstr) #- optional for cjke/cjks type cleaners
-    stn_tst = get_text(fltstr, hps)
-
-    for idx, speaker in enumerate(speakers):
-        sid = torch.LongTensor([idx]).to(device)
-        with torch.no_grad():
-            x_tst = stn_tst.to(device).unsqueeze(0)
-            x_tst_lengths = torch.LongTensor([stn_tst.size(0)]).to(device)
-            audio = (
-                net_g.infer(
-                    x_tst,
-                    x_tst_lengths,
-                    sid=sid,
-                    noise_scale=0.667,
-                    noise_scale_w=0.8,
-                    length_scale=1 / speed,
-                )[0][0, 0]
-                .data.cpu()
-                .float()
-                .numpy()
-            )
-        write(f"{output_dir}/{speaker}.wav", hps.data.sampling_rate, audio)
-        print(f"{output_dir}/{speaker}.wav Generated!")
+# def vcms(inputstr, sid):  # multi
+#     fltstr = re.sub(r"[\[\]\(\)\{\}]", "", inputstr)
+#     # fltstr = langdetector(fltstr) #- optional for cjke/cjks type cleaners
+#     stn_tst = get_text(fltstr, hps)
+#
+#     for idx, speaker in enumerate(speakers):
+#         sid = torch.LongTensor([idx]).to(device)
+#         with torch.no_grad():
+#             x_tst = stn_tst.to(device).unsqueeze(0)
+#             x_tst_lengths = torch.LongTensor([stn_tst.size(0)]).to(device)
+#             audio = (
+#                 net_g.infer(
+#                     x_tst,
+#                     x_tst_lengths,
+#                     sid=sid,
+#                     noise_scale=0.667,
+#                     noise_scale_w=0.8,
+#                     length_scale=1 / speed,
+#                 )[0][0, 0]
+#                 .data.cpu()
+#                 .float()
+#                 .numpy()
+#             )
+#         write(f"{output_dir}/{speaker}.wav", hps.data.sampling_rate, audio)
+#         print(f"{output_dir}/{speaker}.wav Generated!")
 
 
 def ex_voice_conversion(sid_tgt):  # dummy - TODO : further work
@@ -277,5 +268,5 @@ def vctk_inference(generator):
 
 
 # vcss(input)
-wandb.init(project=hps.wandb.project, resume=True, id="xocqlvvl")
+wandb.init(project=hps.wandb.project, resume=False, id=None)
 vctk_inference(net_g)
