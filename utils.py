@@ -7,6 +7,7 @@ import socket
 import subprocess
 import sys
 from contextlib import closing
+from copy import deepcopy
 
 import numpy as np
 import torch
@@ -30,20 +31,22 @@ def find_free_port() -> int:
     return port
 
 
-def load_checkpoint(checkpoint_path, model, optimizer=None):
+def load_checkpoint(checkpoint_path, model, optimizer=None, loading_generator=False):
     assert os.path.isfile(checkpoint_path)
     checkpoint_dict = torch.load(checkpoint_path, map_location="cpu")
     iteration = checkpoint_dict["iteration"]
     learning_rate = checkpoint_dict["learning_rate"]
-    if optimizer is not None:
-        optimizer.load_state_dict(checkpoint_dict["optimizer"])
+    optimizer_state_dict = checkpoint_dict["optimizer"]
+    new_optimizer_state_dict = deepcopy(optimizer_state_dict)
     saved_state_dict = checkpoint_dict["model"]
     if hasattr(model, "module"):
         state_dict = model.module.state_dict()
     else:
         state_dict = model.state_dict()
     new_state_dict = {}
+    i = 0
     for k, v in state_dict.items():
+        i += 1
         try:
             if k == "emb_g.weight" and v.shape != saved_state_dict[k].shape:
                 target_speakers_n = v.shape[0]
@@ -69,13 +72,21 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
         except:
             logger.info("%s is not in the checkpoint" % k)
             new_state_dict[k] = v
+        # print(f"{k}: {new_state_dict[k].shape}")
     if hasattr(model, "module"):
-        model.module.load_state_dict(new_state_dict)
+        model.module.load_state_dict(new_state_dict, strict=False)
+        if loading_generator:
+            model.module.emb_g.weight.requires_grad = True
+            logger.info(f"Grad True for embedding is set.")
     else:
-        model.load_state_dict(new_state_dict)
+        model.load_state_dict(new_state_dict, strict=False)
+        if loading_generator:
+            model.emb_g.weight.requires_grad = True
+            logger.info(f"Grad True for embedding is set.")
     logger.info(
         "Loaded checkpoint '{}' (iteration {})".format(checkpoint_path, iteration)
     )
+    optimizer.load_state_dict(new_optimizer_state_dict)
     return model, optimizer, learning_rate, iteration
 
 
@@ -98,25 +109,6 @@ def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path)
         },
         checkpoint_path,
     )
-
-
-def summarize(
-    writer,
-    global_step,
-    scalars={},
-    histograms={},
-    images={},
-    audios={},
-    audio_sampling_rate=22050,
-):
-    for k, v in scalars.items():
-        writer.add_scalar(k, v, global_step)
-    for k, v in histograms.items():
-        writer.add_histogram(k, v, global_step)
-    for k, v in images.items():
-        writer.add_image(k, v, global_step, dataformats="HWC")
-    for k, v in audios.items():
-        writer.add_audio(k, v, global_step, audio_sampling_rate)
 
 
 def latest_checkpoint_path(dir_path, regex="G_*.pth"):

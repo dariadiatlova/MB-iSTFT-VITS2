@@ -26,6 +26,7 @@ from utils import find_free_port
 torch.autograd.set_detect_anomaly(True)
 torch.backends.cudnn.benchmark = True
 global_step = 0
+log_original_audio = True
 
 
 # - base vits2 : Aug 29, 2023
@@ -94,7 +95,7 @@ def run(rank, n_gpus, hps, dist_url):
         shuffle=True,
     )
 
-    collate_fn = TextAudioCollate(return_ids=True)
+    collate_fn = TextAudioSpeakerCollate()
     train_loader = DataLoader(
         train_dataset,
         num_workers=0,
@@ -196,6 +197,7 @@ def run(rank, n_gpus, hps, dist_url):
         hps.train.segment_size // hps.data.hop_length,
         mas_noise_scale_initial=mas_noise_scale_initial,
         noise_scale_delta=noise_scale_delta,
+        n_speakers=hps.data.n_speakers,
         **hps.model,
     ).cuda(rank)
     net_d = MultiPeriodDiscriminator(hps.model.use_spectral_norm).cuda(rank)
@@ -277,7 +279,6 @@ def run(rank, n_gpus, hps, dist_url):
                 scaler,
                 [train_loader, eval_loader],
                 logger,
-                None,
             )
         else:
             train_and_evaluate(
@@ -290,7 +291,6 @@ def run(rank, n_gpus, hps, dist_url):
                 scaler,
                 [train_loader, None],
                 None,
-                None,
             )
         scheduler_g.step()
         scheduler_d.step()
@@ -299,7 +299,7 @@ def run(rank, n_gpus, hps, dist_url):
 
 
 def train_and_evaluate(
-    rank, epoch, hps, nets, optims, schedulers, scaler, loaders, logger, writers
+    rank, epoch, hps, nets, optims, schedulers, scaler, loaders, logger
 ):
     net_g, net_d, net_dur_disc = nets
     optim_g, optim_d, optim_dur_disc = optims
@@ -470,12 +470,12 @@ def train_and_evaluate(
                     loss_subband,
                 ]
 
-                logger.info(
-                    "Train Epoch: {} [{:.0f}%]".format(
-                        epoch, 100.0 * batch_idx / len(train_loader)
-                    )
-                )
-                logger.info([x.item() for x in losses] + [global_step, lr])
+                # logger.info(
+                #     "Train Epoch: {} [{:.0f}%] [!n]".format(
+                #         epoch, 100.0 * batch_idx / len(train_loader)
+                #     )
+                # )
+                # logger.info([x.item() for x in losses] + [global_step, lr])
 
                 scalar_dict = {
                     "train_loss/g_total": loss_gen_all.item(),
@@ -504,7 +504,7 @@ def train_and_evaluate(
                 wandb.log(scalar_dict)
 
             if global_step % hps.train.eval_interval == 0:
-                evaluate(hps, net_g, eval_loader, None)
+                evaluate(hps, net_g, eval_loader)
                 utils.save_checkpoint(
                     net_g,
                     optim_g,
@@ -529,11 +529,12 @@ def train_and_evaluate(
                     )
         global_step += 1
 
-    if rank == 0:
-        logger.info("====> Epoch: {}".format(epoch))
+    # if rank == 0:
+    #     logger.info("====> Epoch: {}".format(epoch))
 
 
-def evaluate(hps, generator, eval_loader, writer_eval):
+def evaluate(hps, generator, eval_loader):
+    global log_original_audio
     generator.eval()
     original_audio_dict, generated_audio_dict = {}, {}
     with torch.no_grad():
@@ -555,7 +556,7 @@ def evaluate(hps, generator, eval_loader, writer_eval):
             )
             y_hat_lengths = mask.sum([1, 2]).long() * hps.data.hop_length
 
-        if global_step == 0:
+        if log_original_audio:
             for n in range(y.shape[0]):
                 speaker_id = speaker_ids.detach().cpu()[n]
                 original_audio_dict.update(
@@ -580,8 +581,9 @@ def evaluate(hps, generator, eval_loader, writer_eval):
                     )
                 },
             )
-    if global_step == 0:
+    if log_original_audio:
         wandb.log(original_audio_dict)
+        log_original_audio = False
     wandb.log(generated_audio_dict)
 
     torch.cuda.empty_cache()

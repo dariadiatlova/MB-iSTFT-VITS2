@@ -1,7 +1,7 @@
 {
     "train": {
       "log_interval": 1,
-      "eval_interval": 1000,
+      "eval_interval": 120,
       "seed": 1234,
       "epochs": 500,
       "learning_rate": 2e-4,
@@ -23,9 +23,9 @@
     },
     "data": {
       "use_mel_posterior_encoder": true,
-      "training_files":"/app/filelists/mipht/train/vctk_audio_sid_text_train_filelist.txt.cleaned",
-      "validation_files":"/app/filelists/mipht/train/vctk_audio_sid_text_val_filelist.txt.cleaned",
-      "test_files":"/app/filelists/mipht/train/vctk_audio_sid_text_test_filelist.txt.cleaned",
+      "training_files":"/app/filelists/mipht/finetune/vctk_audio_sid_text_train_filelist.txt.cleaned",
+      "validation_files":"/app/filelists/mipht/finetune/vctk_audio_sid_text_val_filelist.txt.cleaned",
+      "test_files":"/app/filelists/mipht/finetune/vctk_audio_sid_text_test_filelist.txt.cleaned",
       "text_cleaners":["english_cleaners3"],
       "max_wav_value": 1,
       "data_folder_prefix": "/app/data",
@@ -37,7 +37,7 @@
       "mel_fmin": 0.0,
       "mel_fmax": null,
       "add_blank": true,
-      "n_speakers": 103,
+      "n_speakers": 108,
       "cleaned_text": true
     },
     "model": {
