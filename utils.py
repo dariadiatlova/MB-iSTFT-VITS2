@@ -45,7 +45,27 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
     new_state_dict = {}
     for k, v in state_dict.items():
         try:
-            new_state_dict[k] = saved_state_dict[k]
+            if k == "emb_g.weight" and v.shape != saved_state_dict[k].shape:
+                target_speakers_n = v.shape[0]
+                trained_speakers_n = saved_state_dict[k].shape[0]
+                logger.info(
+                    f"Loaded checkpoint for speakers: {target_speakers_n}, "
+                    f"initialize embeddings for: {target_speakers_n}-{trained_speakers_n} randomly."
+                )
+                new_state_dict[k] = saved_state_dict[k]
+                new_state_dict[k] = v
+                new_state_dict[k][:trained_speakers_n, :] = saved_state_dict[k]
+                # emb_g grad exponential moving average initialization
+                _exp_avg = optimizer_state_dict['state'][544]['exp_avg']
+                _exp_avg_sq = optimizer_state_dict['state'][544]['exp_avg_sq']
+                new_optimizer_state_dict['state'][544]['exp_avg'] = torch.zeros_like(new_state_dict[k]).float()
+                new_optimizer_state_dict['state'][544]['exp_avg_sq'] = torch.zeros_like(new_state_dict[k]).float()
+                new_optimizer_state_dict['state'][544]['exp_avg'][:trained_speakers_n, :] = _exp_avg
+                new_optimizer_state_dict['state'][544]['exp_avg_sq'][:trained_speakers_n, :] = _exp_avg_sq
+                logger.info(f"Optimizer avg: {new_optimizer_state_dict['state'][544]['exp_avg'].shape}")
+                logger.info(f"Optimizer avg: {new_optimizer_state_dict['state'][544]['exp_avg_sq'].shape}")
+            else:
+                new_state_dict[k] = saved_state_dict[k]
         except:
             logger.info("%s is not in the checkpoint" % k)
             new_state_dict[k] = v

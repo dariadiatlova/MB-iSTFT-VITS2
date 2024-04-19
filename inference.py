@@ -4,12 +4,20 @@ import langdetect
 # import matplotlib.pyplot as plt
 import torch
 import wandb
+<<<<<<< HEAD
 from scipy.io.wavfile import write
+=======
+from tqdm import tqdm, trange
+>>>>>>> 0996d0e (vctk training update)
 from torch.utils.data import DataLoader
 
 import commons
 import utils
+<<<<<<< HEAD
 from data_utils import (TextAudioCollate, TextAudioSpeakerCollate, TextAudioSpeakerLoader)
+=======
+from data_utils import TextAudioSpeakerLoader, TextAudioSpeakerCollate
+>>>>>>> 0996d0e (vctk training update)
 from models import SynthesizerTrn
 from text import text_to_sequence
 from text.symbols import symbols
@@ -223,7 +231,11 @@ def vctk_inference(generator):
             y,
             y_lengths,
             speaker_ids,
+<<<<<<< HEAD
         ) in enumerate(test_loader):
+=======
+        ) in tqdm(enumerate(test_loader), total=len(test_loader), leave=True, desc="Test loader..."):
+>>>>>>> 0996d0e (vctk training update)
             x, x_lengths = x.to(device), x_lengths.to(device)
             y, y_lengths = y.to(device), y_lengths.to(device)
             speaker_ids = speaker_ids.to(device)

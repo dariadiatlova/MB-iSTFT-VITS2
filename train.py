@@ -13,12 +13,12 @@ from torch.utils.data import DataLoader
 import commons
 import utils
 from data_utils import (DistributedBucketSampler, TextAudioCollate,
-                        TextAudioSpeakerLoader)
+                        TextAudioSpeakerLoader, TextAudioSpeakerCollate)
 from losses import (discriminator_loss, feature_loss, generator_loss, kl_loss,
                     subband_stft_loss)
 from mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 from models import (AVAILABLE_FLOW_TYPES, DurationDiscriminator,
-                    MultiPeriodDiscriminator, SynthesizerTrn)
+                    MultiPeriodDiscriminator, SynthesizerTrn, DurationDiscriminator2)
 from pqmf import PQMF
 from text.symbols import symbols
 from utils import find_free_port
@@ -166,13 +166,25 @@ def run(rank, n_gpus, hps, dist_url):
     ):
         print("Using duration discriminator for VITS2")
         use_duration_discriminator = True
-        net_dur_disc = DurationDiscriminator(
-            hps.model.hidden_channels,
-            hps.model.hidden_channels,
-            3,
-            0.1,
-            gin_channels=hps.model.gin_channels if hps.data.n_speakers != 0 else 0,
-        ).cuda(rank)
+        if hps.model.duration_discriminator_type == "dur_disc_1":
+            net_dur_disc = DurationDiscriminator(
+                hps.model.hidden_channels,
+                hps.model.hidden_channels,
+                3,
+                0.1,
+                gin_channels=hps.model.gin_channels if hps.data.n_speakers != 0 else 0,
+            ).cuda(rank)
+        elif hps.model.duration_discriminator_type == "dur_disc_2":
+            net_dur_disc = DurationDiscriminator2(
+                hps.model.hidden_channels,
+                hps.model.hidden_channels,
+                3,
+                0.1,
+                gin_channels=hps.model.gin_channels if hps.data.n_speakers != 0 else 0,
+            ).cuda(rank)
+        else:
+            assert False, (f"Tried to use duration discriminator, but duration discriminator type "
+                           f"{hps.model.duration_discriminator_type} is unknown!")
     else:
         print("NOT using any duration discriminator like VITS1")
         net_dur_disc = None
@@ -219,7 +231,7 @@ def run(rank, n_gpus, hps, dist_url):
 
     try:
         _, _, _, epoch_str = utils.load_checkpoint(
-            utils.latest_checkpoint_path(hps.model_dir, "G_*.pth"), net_g, optim_g
+            utils.latest_checkpoint_path(hps.model_dir, "G_*.pth"), net_g, optim_g, loading_generator=True
         )  # utils.latest_checkpoint_path(hps.model_dir, "G_*.pth")
         _, _, _, epoch_str = utils.load_checkpoint(
             utils.latest_checkpoint_path(hps.model_dir, "D_*.pth"), net_d, optim_d
@@ -230,7 +242,8 @@ def run(rank, n_gpus, hps, dist_url):
                 net_dur_disc,
                 optim_dur_disc,
             )
-        global_step = (epoch_str - 1) * len(train_loader)
+        previous_train_loader_len = 1277 # hard coded for finetuning case as finetune train loader is much smaller
+        global_step = (epoch_str - 1) * previous_train_loader_len #len(train_loader)
         print(f"Successfully initialized from global step: {global_step}!")
     except Exception as e:
         print(e)
@@ -301,7 +314,7 @@ def train_and_evaluate(
         net_dur_disc.train()
 
     if rank == 0:
-        loader = tqdm.tqdm(train_loader, desc="Loading training data")
+        loader = tqdm.tqdm(train_loader, desc="Loading training data", leave=True, total=len(train_loader))
     else:
         loader = train_loader
 
