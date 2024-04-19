@@ -31,25 +31,42 @@ mkdir monotonic_align
 python setup.py build_ext --inplace
 ```
 4. Login to wandb account (type `wandb login` and copy-paste the authorization key from the browser).
+
+5. Download data
+```commandline
+cd /app/data
+gdown --id 1_AbWa07zKk678AUFyEtKjQo4wRWbv_HB # download checkpoints 
+gdown --id 1u2vg-4zyCMgUEyRYRgO78FGX2yMyMgdT # download audio files
+tar -xvzf DUMMY2.tar.gz DUMMY2
+tar -xvzf train_logs.tar.gz train_logs
+```
+6. Run [train.py](train.py)
+```commandline
+python -m train -c /app/data/configs/mb_istft_vits2_finetune.json -m /app/data/train_logs
+```
 ### Colab notebook
 Follow instructions in [training_colab.ipynb](training_colab.ipynb)
 
 ## Homework
 
-1. Finetune MB-iSTFT-VITS2 on 5 speakers. Find filelists in [finetune](filelists/mipht/finetune) folder.
+The main tasks are written in regular font, while _italic_ font indicates additional tasks **for extra credit**.
 
-    - train new speaker embeddings for new speakers
-    - fine-tune old speaker-embeddings with new-speaker voices*
-    - fine-tune the whole network and partly frozen, compare the results*
-    - dive into the code and propose your conditioning mechanism, compare the results**
+1. Finetune MB-iSTFT-VITS2 on 5 speakers for 50 epochs. Find the file lists in the [finetune](filelists/mipht/finetune) folder.
+
+- Download the trained model weights and finetune model with new speaker embeddings.
+- _Initialize new speaker embeddings from the weights of the old speaker embeddings._
+- _Finetune the model with all parameters frozen except for the gender embedding._
+- _Train the model from scratch on the finetune dataset._
+- _Dive into the code and propose your conditioning mechanism, then compare the results._
    
-2. Implement at least one metric for TTS generation assessment:
+2. Evaluate your results on test files:
+- Implement at least one metric for TTS assessment and evaluate audios generated at different training stages.
+- Log results to Weights & Biases (modify the [inference.py](inference.py) script).
+- _Modify the [train.py](train.py) script to evaluate test files during training._
+- _Implement several metrics and evaluate the generated audio results._
+- 
+3. Create a report using Weights & Biases (wandb) by following this guide: [Create a Report with wandb](https://docs.wandb.ai/guides/reports/create-a-report). Log loss charts, audio samples, and metrics in the report.
 
-    - finetune the model for 50 epoch, evaluate generation for each 10th checkpoint;
-    - log results to wandb (modify [inference.py](inference.py) script)
-    - modify [train.py](train.py) and evaluate train / evaluation files during training. 
-3. Create the report using wandb, attach loss charts, audio samples and metrics on different epochs.  
-      
 
 [//]: # (8. Edit [configurations]&#40;configs&#41; based on files and cleaners you used.)
 
@@ -77,7 +94,7 @@ python train.py -c configs/mb_istft_vits2_base.json -m <path_to_logs_and_ckpt_di
 ### Evaluation Example
 ```sh
 # modify parameters in inference.py: path_to_config, path_to_model
-python inference.py 
+python -m inference
 ```
 
 ## Credits
