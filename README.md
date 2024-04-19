@@ -45,6 +45,9 @@ tar -xvzf train_logs.tar.gz train_logs
 python -m train -c /app/data/configs/mb_istft_vits2_finetune.json -m /app/data/train_logs
 ```
 ### Colab notebook
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1iXgYMI5fTWXI4XbY13OXrm1E9PmsnOlI?usp=sharing)
+
+
 Follow instructions in [training_colab.ipynb](training_colab.ipynb)
 
 ## Homework
@@ -62,9 +65,9 @@ The main tasks are written in regular font, while _italic_ font indicates additi
 2. Evaluate your results on test files:
 - Implement at least one metric for TTS assessment and evaluate audios generated at different training stages.
 - Log results to Weights & Biases (modify the [inference.py](inference.py) script).
-- _Modify the [train.py](train.py) script to evaluate test files during training._
+- _Modify the [train.py](train.py) script to evaluate validation files during training._
 - _Implement several metrics and evaluate the generated audio results._
-- 
+  
 3. Create a report using Weights & Biases (wandb) by following this guide: [Create a Report with wandb](https://docs.wandb.ai/guides/reports/create-a-report). Log loss charts, audio samples, and metrics in the report.
 
 
